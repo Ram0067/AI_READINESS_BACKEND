@@ -42,7 +42,7 @@ class Answer(models.Model):
     )
 
     question_id = models.CharField(max_length=10)
-    section = models.CharField(max_length=100)
+    section = models.CharField(max_length=50)
     question_text = models.TextField()
     answer_type = models.CharField(max_length=20)
     raw_value = models.JSONField()
