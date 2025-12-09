@@ -9,6 +9,7 @@ env/
 .ai_env/
 .ai-env/
 .ai/
+ai/
 
 # Django stuff
 db.sqlite3
