@@ -1,18 +1,18 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .questions_config import QUESTIONS
 from rest_framework import status
-from .serializers import AssessmentCreateSerializer, QUESTION_INDEX
-
+from .questions_config import QUESTIONS
+from .serializers import AssessmentCreateSerializer
+from .models import Assessment
 
 class QuestionsView(APIView):
     """
     GET /api/ai-readiness/questions/
     Returns questions for dynamic form rendering.
     """
-
     def get(self, request):
-        return Response({"questions": QUESTIONS})
+        # Return the QUESTIONS config the frontend expects
+        return Response({"questions": QUESTIONS}, status=status.HTTP_200_OK)
 
 
 class SubmitAssessmentView(APIView):
@@ -20,12 +20,10 @@ class SubmitAssessmentView(APIView):
     POST /api/ai-readiness/submit/
     Save answers + return scoring & feedback
     """
-
     def post(self, request):
         serializer = AssessmentCreateSerializer(data=request.data)
         if serializer.is_valid():
             assessment = serializer.save()
-
             return Response(
                 {
                     "assessment_id": str(assessment.id),
@@ -40,5 +38,4 @@ class SubmitAssessmentView(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

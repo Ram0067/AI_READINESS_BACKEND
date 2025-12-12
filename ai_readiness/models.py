@@ -2,32 +2,46 @@ import uuid
 from django.db import models
 from django.utils import timezone
 
-
-class Assessment(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    # Lead for sales team
-    email = models.EmailField(db_index=True)
-
-    # Scores saved after calculation
-    overall_score = models.DecimalField(
-    max_digits=5, decimal_places=1, null=True, blank=True)
-    category = models.CharField(max_length=50, null=True, blank=True)
-
-    # Breakdown (JSON) e.g. {"data": 6.2, "adoption": 6.7, ...}
-    dimension_scores = models.JSONField(null=True, blank=True)
-
-    # AI feedback strings
-    feedback_summary = models.TextField(null=True, blank=True)
-    feedback_profile = models.TextField(null=True, blank=True)
-    feedback_category_detail = models.TextField(null=True, blank=True)
-    feedback_recommended_actions = models.JSONField(null=True, blank=True)
-
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
+class Question(models.Model):
+    # If you prefer single source of truth, you can seed this from QUESTIONS
+    key = models.CharField(max_length=32, unique=True)  # e.g., "A1", "B4"
+    text = models.TextField()
+    section = models.CharField(max_length=64, blank=True, null=True)
+    order = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"{self.email} – {self.category or 'Pending'}"
+        return f"{self.key}: {self.text[:60]}"
+
+
+class Assessment(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # contact / meta
+    person_name = models.CharField(max_length=200, blank=True, null=True)
+    company_name = models.CharField(max_length=200, blank=True, null=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30, blank=True, null=True)
+    designation = models.CharField(max_length=100, blank=True, null=True)
+
+    # raw / computed
+    raw_score = models.FloatField(default=0.0)          # sum of numeric answers if applicable
+    raw_percent = models.FloatField(default=0.0)        # normalized 0..100 if you use normalization
+    capped_percent = models.FloatField(default=0.0)     # final value after PDF capping rules
+    overall_score = models.FloatField(default=0.0)      # the "overall" percent your serializer expects
+    category = models.CharField(max_length=64, blank=True, null=True)
+
+    # store dimension scores and rich feedback
+    dimension_scores = models.JSONField(default=dict, blank=True)
+    feedback_summary = models.TextField(blank=True, null=True)
+    feedback_profile = models.TextField(blank=True, null=True)
+    feedback_category_detail = models.TextField(blank=True, null=True)
+    feedback_recommended_actions = models.JSONField(default=list, blank=True)
+
+    extra = models.JSONField(default=dict, blank=True)  # store additional form fields
+
+    def __str__(self):
+        return f"Assessment #{self.id} ({self.email})"
 
 
 class Answer(models.Model):
@@ -40,17 +54,25 @@ class Answer(models.Model):
         on_delete=models.CASCADE,
         related_name="answers",
     )
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.PROTECT,
+        related_name="answers",
+    )
 
-    question_id = models.CharField(max_length=10)
-    section = models.CharField(max_length=50)
-    question_text = models.TextField()
-    answer_type = models.CharField(max_length=20)
+    # raw_value holds whatever was submitted (string/list/number)
     raw_value = models.JSONField()
 
-    created_at = models.DateTimeField(default=timezone.now)
+    # for numeric tasks (ratings), keep a numeric value we can sum/aggregate
+    value_numeric = models.FloatField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("assessment", "question_id")
+        unique_together = ("assessment", "question")
+        indexes = [
+            models.Index(fields=["assessment", "question"]),
+        ]
 
     def __str__(self):
-        return f"{self.assessment.email} – {self.question_id}"
+        return f"Answer: {self.question.key} -> {self.raw_value} (assmnt {self.assessment_id})"
