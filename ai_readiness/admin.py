@@ -1,22 +1,28 @@
 from django.contrib import admin
-from .models import Assessment, Answer
+from .models import Assessment, Answer, Question
 
 
-# Inline to display answers inside the Assessment page
+# Inline to show answers inside Assessment page
 class AnswerInline(admin.TabularInline):
     model = Answer
     extra = 0
-    readonly_fields = ("question_id", "section", "question_text", "answer_type", "raw_value")
+    readonly_fields = ("question", "raw_value", "value_numeric")
+    fields = ("question", "raw_value", "value_numeric")
     can_delete = False
 
 
 @admin.register(Assessment)
 class AssessmentAdmin(admin.ModelAdmin):
-    list_display = ("email", "category", "overall_score", "created_at")
-    search_fields = ("email", "category")
+    list_display = ("email", "company_name", "category", "overall_score", "created_at")
+    search_fields = ("email", "company_name", "category")
     list_filter = ("category", "created_at")
+
     readonly_fields = (
+        "person_name",
+        "company_name",
         "email",
+        "phone",
+        "designation",
         "overall_score",
         "category",
         "dimension_scores",
@@ -24,14 +30,16 @@ class AssessmentAdmin(admin.ModelAdmin):
         "feedback_profile",
         "feedback_category_detail",
         "feedback_recommended_actions",
+        "raw_score",
         "created_at",
         "updated_at",
     )
+
     inlines = [AnswerInline]
 
     fieldsets = (
-        ("Lead / Client Info", {
-            "fields": ("email",)
+        ("Client Details", {
+            "fields": ("person_name", "company_name", "email", "phone", "designation")
         }),
         ("AI Readiness Score & Category", {
             "fields": ("overall_score", "category", "dimension_scores")
@@ -42,17 +50,17 @@ class AssessmentAdmin(admin.ModelAdmin):
                 "feedback_profile",
                 "feedback_category_detail",
                 "feedback_recommended_actions",
-            ),
+            )
         }),
-        ("System Data", {
-            "fields": ("created_at", "updated_at"),
+        ("System Metadata", {
+            "fields": ("raw_score", "created_at", "updated_at")
         }),
     )
 
 
 @admin.register(Answer)
 class AnswerAdmin(admin.ModelAdmin):
-    list_display = ("assessment", "question_id", "section", "answer_type")
-    search_fields = ("assessment__email", "question_text", "section", "question_id")
-    list_filter = ("section", "answer_type")
-    readonly_fields = ("assessment", "question_id", "section", "question_text", "answer_type", "raw_value", "created_at")
+    list_display = ("id", "assessment", "question", "raw_value", "value_numeric")
+    readonly_fields = ("assessment", "question", "raw_value", "value_numeric")
+    search_fields = ("assessment__email", "question__key", "question__text")
+    list_filter = ("question__section",)
