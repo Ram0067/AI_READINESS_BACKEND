@@ -4,7 +4,8 @@ from rest_framework import status
 from .questions_config import QUESTIONS
 from .serializers import AssessmentCreateSerializer
 from .models import Assessment
-
+from django.http import FileResponse, Http404
+from .report_generator import generate_pdf_report, generate_word_report
 class QuestionsView(APIView):
     """
     GET /api/ai-readiness/questions/
@@ -39,3 +40,33 @@ class SubmitAssessmentView(APIView):
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class DownloadReportView(APIView):
+    def get(self, request, assessment_id):
+        format_type = request.GET.get("format", "pdf")
+
+        try:
+            assessment = Assessment.objects.get(id=assessment_id)
+        except Assessment.DoesNotExist:
+            raise Http404("Assessment not found")
+
+        if format_type == "pdf":
+            buffer = generate_pdf_report(assessment)
+            return FileResponse(
+                buffer,
+                as_attachment=True,
+                filename=f"AI_Readiness_Report_{assessment_id}.pdf",
+                content_type="application/pdf"
+            )
+
+        elif format_type == "docx":
+            buffer = generate_word_report(assessment)
+            return FileResponse(
+                buffer,
+                as_attachment=True,
+                filename=f"AI_Readiness_Report_{assessment_id}.docx",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+
+        else:
+            raise Http404("Invalid format")
